@@ -22,38 +22,36 @@ function AppRoutes() {
   };
 
   const handleLogin = async (credentials) => {
-    try {
-      // Check if user exists using the login function
-      const userData = await authService.login(credentials.phone);
+      try {
+        console.log('Login attempt:', credentials);
+        const userData = await authService.login(credentials.phone);
+        console.log('User data from login:', userData);
 
-      if (userData && userData.length > 0) {
-        // User exists, send OTP
-        const otpResponse = await authService.sendOtp(credentials.phone);
+        if (userData && userData.length > 0) {
+          console.log('User exists, sending OTP');
+          const otpResponse = await authService.sendOtp(credentials.phone);
+          console.log('OTP send response:', otpResponse);
 
-        if (otpResponse.status === 'success') {
-          setLoginData(credentials);
-          if (credentials.phone === ADMIN_PHONE) {
-            setIsAdmin(true);
+          if (otpResponse.status === 'success') {
+            setLoginData(credentials);
+            if (credentials.phone === ADMIN_PHONE) {
+              setIsAdmin(true);
+            }
+            navigate('/otp');
+          } else {
+            alert('Failed to send OTP. Please try again.');
           }
-          navigate('/otp');
         } else {
-          alert('Failed to send OTP. Please try again.');
+          console.log('New user, redirecting to signup');
+          alert('This phone number is not registered. Please sign up first.');
+          setLoginData({ phone: credentials.phone });
+          navigate('/signup');
         }
-      } else {
-        // New user - redirect to signup
-        alert('This phone number is not registered. Please sign up first.');
-        setLoginData({ phone: credentials.phone });
-        navigate('/signup');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      if (error.message.includes('Network Error') || error.message.includes('CORS')) {
-        alert('Connection error. Please check your network and try again.');
-      } else {
+      } catch (error) {
+        console.error('Login error details:', error);
         alert(error.message || 'Login failed. Please try again.');
       }
-    }
-  };
+    };
 
   const handleAdminLogin = async (credentials) => {
     if (credentials.phone !== ADMIN_PHONE) {
@@ -86,27 +84,32 @@ function AppRoutes() {
 
   const handleOTPVerified = async (enteredOtp) => {
     try {
+      console.log('OTP verification started:', loginData.phone, enteredOtp);
       const verifyResponse = await authService.verifyOtp(loginData.phone, enteredOtp);
+      console.log('OTP verification result:', verifyResponse);
 
       if (verifyResponse.status === 'success') {
+        console.log('OTP verified successfully');
+
+        // TEMPORARY: Bypass user data fetch for testing
         if (isAdmin) {
-          // For admin, navigate directly to dashboard
+          console.log('Navigating to admin dashboard');
+          setUser({ user_name: 'Admin User', user_phone_number: ADMIN_PHONE });
           navigate('/admin-dashboard');
         } else {
-          // For regular users, get user data after OTP verification
-          const userData = await authService.login(loginData.phone);
-          if (userData && userData.length > 0) {
-            setUser(userData[0]);
-            navigate('/user-dashboard');
-          } else {
-            alert('User data not found after OTP verification.');
-          }
+          console.log('Navigating to user dashboard with temporary data');
+          setUser({
+            user_name: loginData.name || 'Test User',
+            user_phone_number: loginData.phone
+          });
+          navigate('/user-dashboard');
         }
+
       } else {
         alert('Invalid OTP. Please try again.');
       }
     } catch (error) {
-      console.error('OTP verification error:', error);
+      console.error('OTP verification error details:', error);
       alert(error.message || 'OTP verification failed. Please try again.');
     }
   };
@@ -141,41 +144,44 @@ function AppRoutes() {
   };
 
   const handleSignUpComplete = async (enteredOtp) => {
-    try {
-      const verifyResponse = await authService.verifyOtp(loginData.phone, enteredOtp);
+      try {
+        console.log('Signup completion started:', loginData, enteredOtp);
+        const verifyResponse = await authService.verifyOtp(loginData.phone, enteredOtp);
+        console.log('Signup OTP verification:', verifyResponse);
 
-      if (verifyResponse.status === 'success') {
-        // OTP verified, now register the user with proper data structure
-        const userData = {
-          user_name: loginData.name,
-          user_email: loginData.email,
-          user_phone_number: parseInt(loginData.phone),
-          user_password: loginData.password
-        };
-
-        const registerResponse = await authService.register(userData);
-
-        if (registerResponse === 'User registered successfully !!!') {
-          // Registration successful - create user object for frontend
-          const newUser = {
+        if (verifyResponse.status === 'success') {
+          console.log('Creating user data for registration:', loginData);
+          const userData = {
             user_name: loginData.name,
             user_email: loginData.email,
-            user_phone_number: loginData.phone
+            user_phone_number: parseInt(loginData.phone),
+            user_password: loginData.password
           };
 
-          setUser(newUser);
-          navigate('/user-dashboard');
+          console.log('Sending registration data:', userData);
+          const registerResponse = await authService.register(userData);
+          console.log('Registration response:', registerResponse);
+
+          if (registerResponse === 'User registered successfully !!!') {
+            const newUser = {
+              user_name: loginData.name,
+              user_email: loginData.email,
+              user_phone_number: loginData.phone
+            };
+
+            setUser(newUser);
+            navigate('/user-dashboard');
+          } else {
+            alert('Registration failed. Please try again.');
+          }
         } else {
-          alert('Registration failed. Please try again.');
+          alert('Invalid OTP. Please try again.');
         }
-      } else {
-        alert('Invalid OTP. Please try again.');
+      } catch (error) {
+        console.error('Registration error details:', error);
+        alert(error.message || 'Registration failed. Please try again.');
       }
-    } catch (error) {
-      console.error('Registration error:', error);
-      alert(error.message || 'Registration failed. Please try again.');
-    }
-  };
+    };
 
   const handleLogout = () => {
     setUser(null);
